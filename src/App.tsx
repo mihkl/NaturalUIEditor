@@ -94,3 +94,12 @@ function App() {
 }
 
 export default App;
+
+<div className="flex items-center gap-2">
+  <button className="px-4 py-2 bg-blue-600 text-white rounded-none hover:bg-blue-700 transition-colors">
+    Confirm
+  </button>
+  <button className="px-4 py-2 bg-gray-200 text-gray-800 rounded-none hover:bg-gray-300 transition-colors">
+    Cancel
+  </button>
+</div>
