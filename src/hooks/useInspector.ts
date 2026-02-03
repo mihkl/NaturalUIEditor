@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import type { InspectedElement, EditorState } from '@/types';
 import { inspectElement, shouldIgnoreElement, normalizeFilePath } from '@/services/sourceLocator';
-import { fetchSourceCode, findContainingComponent, applyModificationByLines, writeSourceFile, revertSourceFile } from '@/services/fileService';
+import { fetchSourceCode, findContainingComponent, applyModificationByLines, createPullRequest } from '@/services/fileService';
 import { generateModification } from '@/services/aiService';
 
 const initialState: EditorState = {
@@ -18,7 +18,6 @@ export function useInspector() {
   const [hoveredElement, setHoveredElement] = useState<InspectedElement | null>(null);
   const [sourceCode, setSourceCode] = useState<string>('');
   const [componentCode, setComponentCode] = useState<{ code: string; startLine: number; endLine: number; name: string | null } | null>(null);
-  const [isApplied, setIsApplied] = useState(false);
 
   const isInspectingRef = useRef(false);
 
@@ -135,13 +134,15 @@ export function useInspector() {
     }
   }, [state.selectedElement, componentCode]);
 
-  const applyChanges = useCallback(async () => {
-    if (!state.modification?.success || !state.selectedElement?.source || !componentCode) return;
+  const createPR = useCallback(async (): Promise<string | null> => {
+    if (!state.selectedElement?.source || !state.modification?.success || !componentCode) return null;
 
     setState(prev => ({ ...prev, isLoading: true, error: null }));
 
     try {
-      // Use line-based replacement for reliability
+      const filePath = normalizeFilePath(state.selectedElement.source.fileName);
+
+      // Compute the full modified file content
       const modifiedSource = applyModificationByLines(
         sourceCode,
         componentCode.startLine,
@@ -149,71 +150,43 @@ export function useInspector() {
         state.modification.modifiedCode
       );
 
-      const filePath = normalizeFilePath(state.selectedElement.source.fileName);
-      await writeSourceFile(filePath, modifiedSource);
+      const result = await createPullRequest(filePath, modifiedSource, state.modification.explanation);
 
-      setIsApplied(true);
-      setState(prev => ({ ...prev, isLoading: false }));
-    } catch (err) {
-      setState(prev => ({
-        ...prev,
-        isLoading: false,
-        error: err instanceof Error ? err.message : 'Failed to apply changes',
-      }));
-    }
-  }, [state.modification, state.selectedElement, sourceCode, componentCode]);
-
-  const revertChanges = useCallback(async () => {
-    if (!state.selectedElement?.source) return;
-
-    setState(prev => ({ ...prev, isLoading: true, error: null }));
-
-    try {
-      const filePath = normalizeFilePath(state.selectedElement.source.fileName);
-      const reverted = await revertSourceFile(filePath);
-
-      if (reverted) {
-        setIsApplied(false);
+      if (result.success && result.prUrl) {
         setState(prev => ({ ...prev, isLoading: false }));
+        return result.prUrl;
       } else {
         setState(prev => ({
           ...prev,
           isLoading: false,
-          error: 'No backup found to revert',
+          error: result.error || 'Failed to create pull request',
         }));
+        return null;
       }
     } catch (err) {
       setState(prev => ({
         ...prev,
         isLoading: false,
-        error: err instanceof Error ? err.message : 'Failed to revert changes',
+        error: err instanceof Error ? err.message : 'Failed to create pull request',
       }));
+      return null;
     }
-  }, [state.selectedElement]);
+  }, [state.selectedElement, state.modification, sourceCode, componentCode]);
 
   const closeEditor = useCallback(() => {
     setState(initialState);
     setSourceCode('');
     setComponentCode(null);
-    setIsApplied(false);
-  }, []);
-
-  const clearModification = useCallback(() => {
-    setState(prev => ({ ...prev, modification: null, error: null }));
-    setIsApplied(false);
   }, []);
 
   return {
     state,
     hoveredElement,
     componentCode,
-    isApplied,
     startInspecting,
     stopInspecting,
     requestModification,
-    applyChanges,
-    revertChanges,
+    createPR,
     closeEditor,
-    clearModification,
   };
 }

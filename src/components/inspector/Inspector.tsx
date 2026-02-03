@@ -8,14 +8,11 @@ export function Inspector() {
     state,
     hoveredElement,
     componentCode,
-    isApplied,
     startInspecting,
     stopInspecting,
     requestModification,
-    applyChanges,
-    revertChanges,
+    createPR,
     closeEditor,
-    clearModification,
   } = useInspector();
 
   return (
@@ -35,12 +32,9 @@ export function Inspector() {
           modification={state.modification}
           isLoading={state.isLoading}
           error={state.error}
-          isApplied={isApplied}
           onRequestModification={requestModification}
-          onApply={applyChanges}
-          onRevert={revertChanges}
+          onCreatePR={createPR}
           onClose={closeEditor}
-          onClearModification={clearModification}
         />
       )}
     </>

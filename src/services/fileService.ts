@@ -71,6 +71,31 @@ export async function revertSourceFile(filePath: string): Promise<boolean> {
 }
 
 /**
+ * Creates a pull request with the current file changes via GitHub API
+ */
+export async function createPullRequest(
+  filePath: string,
+  content: string,
+  description: string
+): Promise<{ success: boolean; prUrl?: string; error?: string }> {
+  const normalized = normalizeFilePath(filePath);
+
+  const response = await fetch('/__create-pr', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ filePath: normalized, content, description }),
+  });
+
+  const result = await response.json();
+
+  if (response.ok) {
+    return { success: true, prUrl: result.prUrl };
+  }
+
+  return { success: false, error: result.error || 'Failed to create pull request' };
+}
+
+/**
  * Finds the component/function that contains a given line number
  */
 export function findContainingComponent(source: string, lineNumber: number): {

@@ -10,6 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@codesandbox/sandpack-react": "^2.20.0",
     "@google/genai": "^1.39.0",
     "@monaco-editor/react": "^4.7.0",
     "@octokit/rest": "^22.0.1",

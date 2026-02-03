@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { X, Wand2, RotateCcw, Loader2, Play, Undo2, Check } from 'lucide-react';
+import { X, Wand2, Loader2, Undo2, GitPullRequest, ExternalLink, Code, Eye } from 'lucide-react';
 import { DiffView } from './DiffView';
+import { LivePreview } from './LivePreview';
 import type { InspectedElement, ModificationResponse } from '@/types';
 import { normalizeFilePath } from '@/services/sourceLocator';
 
@@ -10,12 +11,9 @@ interface EditorPanelProps {
   modification: ModificationResponse | null;
   isLoading: boolean;
   error: string | null;
-  isApplied: boolean;
   onRequestModification: (instruction: string) => void;
-  onApply: () => void;
-  onRevert: () => void;
+  onCreatePR: () => Promise<string | null>;
   onClose: () => void;
-  onClearModification: () => void;
 }
 
 export function EditorPanel({
@@ -24,14 +22,23 @@ export function EditorPanel({
   modification,
   isLoading,
   error,
-  isApplied,
   onRequestModification,
-  onApply,
-  onRevert,
+  onCreatePR,
   onClose,
-  onClearModification,
 }: EditorPanelProps) {
   const [instruction, setInstruction] = useState('');
+  const [prUrl, setPrUrl] = useState<string | null>(null);
+  const [isCreatingPR, setIsCreatingPR] = useState(false);
+  const [activeTab, setActiveTab] = useState<'preview' | 'diff'>('preview');
+
+  const handleCreatePR = async () => {
+    setIsCreatingPR(true);
+    const url = await onCreatePR();
+    if (url) {
+      setPrUrl(url);
+    }
+    setIsCreatingPR(false);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -108,16 +115,6 @@ export function EditorPanel({
           </div>
         )}
 
-        {/* Applied success message */}
-        {isApplied && (
-          <div className="p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2">
-            <Check size={18} className="text-green-600" />
-            <span className="text-sm text-green-700 font-medium">
-              Changes applied! Check the live preview.
-            </span>
-          </div>
-        )}
-
         {/* Modification preview */}
         {modification && modification.success && (
           <div className="space-y-4">
@@ -126,15 +123,46 @@ export function EditorPanel({
               <p className="text-sm text-blue-700">{modification.explanation}</p>
             </div>
 
-            <div className="border border-gray-200 rounded-lg overflow-hidden">
-              <div className="px-3 py-2 bg-gray-50 border-b border-gray-200">
-                <span className="text-sm font-medium text-gray-700">Code Changes</span>
-              </div>
-              <DiffView
-                original={modification.originalCode}
-                modified={modification.modifiedCode}
-              />
+            {/* Tabs */}
+            <div className="flex border-b border-gray-200">
+              <button
+                onClick={() => setActiveTab('preview')}
+                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === 'preview'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <Eye size={16} />
+                Live Preview
+              </button>
+              <button
+                onClick={() => setActiveTab('diff')}
+                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === 'diff'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <Code size={16} />
+                Code Changes
+              </button>
             </div>
+
+            {/* Tab content */}
+            {activeTab === 'preview' ? (
+              <LivePreview
+                code={modification.modifiedCode}
+                componentName={componentCode?.name || 'App'}
+              />
+            ) : (
+              <div className="border border-gray-200 rounded-lg overflow-hidden">
+                <DiffView
+                  original={modification.originalCode}
+                  modified={modification.modifiedCode}
+                />
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -142,41 +170,45 @@ export function EditorPanel({
       {/* Footer actions */}
       {modification && modification.success && (
         <div className="px-4 py-3 border-t border-gray-200 bg-gray-50 space-y-2">
-          {!isApplied ? (
-            <button
-              onClick={onApply}
-              disabled={isLoading}
-              className="flex items-center justify-center gap-2 w-full px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:bg-gray-300 transition-colors"
+          {prUrl ? (
+            <a
+              href={prUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 w-full px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors"
             >
-              {isLoading ? (
-                <Loader2 size={18} className="animate-spin" />
-              ) : (
-                <Play size={18} />
-              )}
-              Apply Changes (Live Preview)
-            </button>
+              <ExternalLink size={18} />
+              View Pull Request
+            </a>
           ) : (
-            <button
-              onClick={onRevert}
-              disabled={isLoading}
-              className="flex items-center justify-center gap-2 w-full px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:bg-gray-300 transition-colors"
-            >
-              {isLoading ? (
-                <Loader2 size={18} className="animate-spin" />
-              ) : (
+            <>
+              <button
+                onClick={handleCreatePR}
+                disabled={isLoading || isCreatingPR}
+                className="flex items-center justify-center gap-2 w-full px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 disabled:bg-gray-300 transition-colors"
+              >
+                {isCreatingPR ? (
+                  <>
+                    <Loader2 size={18} className="animate-spin" />
+                    Creating PR...
+                  </>
+                ) : (
+                  <>
+                    <GitPullRequest size={18} />
+                    Create Pull Request
+                  </>
+                )}
+              </button>
+              <button
+                onClick={onClose}
+                disabled={isLoading || isCreatingPR}
+                className="flex items-center justify-center gap-2 w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 disabled:bg-gray-100 transition-colors"
+              >
                 <Undo2 size={18} />
-              )}
-              Revert Changes
-            </button>
+                Discard Changes
+              </button>
+            </>
           )}
-          <button
-            onClick={onClearModification}
-            disabled={isLoading}
-            className="flex items-center justify-center gap-2 w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 disabled:bg-gray-100 transition-colors"
-          >
-            <RotateCcw size={18} />
-            Try Different Instruction
-          </button>
         </div>
       )}
     </div>

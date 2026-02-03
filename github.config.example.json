@@ -1,0 +1,7 @@
+{
+  "_comment": "Copy this file to github.config.json and fill in your values",
+  "owner": "your-github-username-or-org",
+  "repo": "your-repository-name",
+  "baseBranch": "main",
+  "apiUrl": "https://api.github.com"
+}
