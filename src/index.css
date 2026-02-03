@@ -1,0 +1,50 @@
+@import "tailwindcss";
+
+:root {
+  --inspector-color: #3b82f6;
+  --inspector-bg: rgba(59, 130, 246, 0.1);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #f8fafc;
+  min-height: 100vh;
+}
+
+/* Inspector highlight overlay */
+.inspector-highlight {
+  position: fixed;
+  pointer-events: none;
+  border: 2px solid var(--inspector-color);
+  background: var(--inspector-bg);
+  z-index: 10000;
+  transition: all 0.05s ease-out;
+}
+
+.inspector-label {
+  position: fixed;
+  background: var(--inspector-color);
+  color: white;
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 2px;
+  z-index: 10001;
+  font-family: monospace;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+/* Prevent selection while inspecting */
+.inspecting {
+  cursor: crosshair !important;
+}
+
+.inspecting * {
+  cursor: crosshair !important;
+  user-select: none !important;
+}
