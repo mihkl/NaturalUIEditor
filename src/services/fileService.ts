@@ -5,33 +5,20 @@
 import { normalizeFilePath } from './sourceLocator';
 
 /**
- * Fetches the source code of a file using Vite's dev server
+ * Fetches the source code of a file using our custom read endpoint.
+ * This bypasses Vite's transformations to get the actual raw file content.
  */
 export async function fetchSourceCode(filePath: string): Promise<string> {
   const normalized = normalizeFilePath(filePath);
 
-  try {
-    const response = await fetch(`/${normalized}?raw`);
-    if (response.ok) {
-      return await response.text();
-    }
-  } catch {
-    // Fall through
+  const response = await fetch(`/__read-file?path=${encodeURIComponent(normalized)}`);
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+    throw new Error(error.error || `Could not fetch source for: ${filePath}`);
   }
 
-  try {
-    const response = await fetch(`/${normalized}`);
-    if (response.ok) {
-      const text = await response.text();
-      if (!text.includes('import.meta') && !text.includes('__vite')) {
-        return text;
-      }
-    }
-  } catch {
-    // Fall through
-  }
-
-  throw new Error(`Could not fetch source for: ${filePath}`);
+  return await response.text();
 }
 
 /**
